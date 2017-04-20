@@ -1,9 +1,6 @@
 import csv
-import sys
 import argparse
-import calendar
 import random
-from pprint import pprint
 
 parser = argparse.ArgumentParser()
 parser.add_argument("name_file", type=str,
@@ -20,7 +17,7 @@ def main():
     with open(args.name_file, 'r') as infile:
         for row in csv.DictReader(infile):
             names.append(row['name'])
- 
+
     random_ids = range(len(names))
     random.shuffle(random_ids)
 

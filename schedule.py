@@ -12,12 +12,19 @@ parser.add_argument("output_file", type=str,
                     help="output file name")
 parser.add_argument('-r', '--randomize',
                     dest='randomize', action='store_true',
-                   help='Randomize the assignments.')
-parser.set_defaults(randomize=False)
+                    default=False,
+                    help='Randomize the assignments.')
+parser.add_argument('-v', '--verbose',
+                    dest='verbose', action='store_true',
+                    default=False,
+                    help='Enable debugging output.')
 
 args = parser.parse_args()
 
+# 'Sun' to 'Sat'
 sun_to_sat = [list(calendar.day_abbr)[-1]] + list(calendar.day_abbr)[:-1]
+
+# Code sequential weeks by appending '_1' and '_2'
 day_names = [dayname+'_{}'.format(i) \
              for i in range(1,3) \
              for dayname in sun_to_sat]
@@ -26,6 +33,9 @@ def create_schedule():
     return {dayname:[] for dayname in day_names}
 
 def assign_n_workers(pool, n):
+    """Given a pool of possible man-hours (by ID) and the number of 
+       employees to assign, return a list of unique IDs drawn from 
+       the pool."""
     workers = []
     ctr = 0
     while len(workers) < n:
@@ -37,7 +47,7 @@ def assign_n_workers(pool, n):
         else:
             random.shuffle(pool)
         if ctr > 1000:
-            raise ValueError("can't assign!")
+            raise ValueError("Can't assign hours--incompatible possibilities!")
     # print "length of pool = ", len(pool)
     return list(sorted(workers)), pool
 
@@ -50,18 +60,20 @@ def assign_n_workers(pool, n):
     # but check the next ID
 # When filled, advance to the next day.
 
-# 5 on Saturday
 # 1 on Sunday (rotates)
 # 9 on Monday
-# 12 on Tuesday
+# 12 on Tuesday (all employees)
 # 9 on Wednesday
 # 9 on Thursday 
 # 10 on Friday
+# 5 on Saturday
 # 55 total spots.
 
 # Excluding Sunday and Tuesday, everyone works 7 total slots over 
 # two weeks.
 def assign_all_workers(pool, schedule, cids):
+    """Given a pool of possible man-hours, return a completed
+       schedule."""
     for day_of_week, workers in schedule.iteritems():
         # print day_of_week
         if 'Fri' in day_of_week:
@@ -78,9 +90,10 @@ def assign_all_workers(pool, schedule, cids):
     return schedule
 
 def main():
-    # Define the inputs: people's names and status
+    # Initialize an empty dictionary to store the lookup table
     id_to_name = {}
 
+    # Load the name file
     print "Using {} as input file".format(args.input_file)
     with open(args.input_file, 'r') as infile:
         for cid, row in enumerate(csv.DictReader(infile)):
@@ -89,17 +102,21 @@ def main():
     cids = id_to_name.keys()
     pool = [cid for cid in cids for _ in xrange(7)]
 
+    # Optional argument for full randomization
     if not args.randomize:
         random.seed(1)
     random.shuffle(pool) # randomize the placement
 
     finished = False
     iters = 0
+
     while not finished:
         iters += 1
         try:
             schedule = create_schedule()
-            # print "pool size = ", len(pool)
+            # Debug
+            if args.verbose:
+                print "pool size = ", len(pool)
             final_schedule = assign_all_workers(pool, schedule, cids)
             finished = True
 
@@ -109,17 +126,19 @@ def main():
                                             for i in workers] \
                               for day_of_week, workers \
                               in final_schedule.iteritems()}
+            # Final output
             pprint(schedule_names)
 
         except:
-            ## DEBUG
-            # print "ERROR! Trying again!"
-            # print sys.exc_info()
-            # print schedule
+            # Debug
+            if args.verbose:
+                print "ERROR! Trying again!"
+                print sys.exc_info()
+                print schedule
             pool = [cid for cid in cids for _ in xrange(7)]
             random.shuffle(pool) # randomize the placement
 
-        if iters % 10000 == 0:
+        if iters % 10000 == 0 and args.verbose:
             print "ran {} iterations".format(iters)
 
     with open(args.output_file, 'w') as outfile:
